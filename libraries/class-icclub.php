@@ -89,6 +89,7 @@ class ICClub {
 
 		if ( defined( 'ICCLUB_LIBRARIES_PATH' ) ) {
 			require ICCLUB_LIBRARIES_PATH . 'class-api.php';
+			require ICCLUB_LIBRARIES_PATH . 'class-settings.php';
 		}
 
 	}

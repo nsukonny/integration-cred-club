@@ -35,8 +35,7 @@ class ICClub_API {
 	 */
 	public function get_order( WP_REST_Request $request ) {
 
-		$secret_key = get_option( 'icclub-secret' );
-		$secret_key = 'that_is_sekret_key_3342'; //TODO remove it
+		$secret_key = get_option( 'icclub-secret-key' );
 
 		if ( $request->get_header( 'secret' ) !== $secret_key ) {
 			return new WP_Error(
@@ -47,7 +46,9 @@ class ICClub_API {
 		}
 
 		$order_id = $this->make_order( $request );
-
+		if ( $order_id ) {
+			wp_send_json( array( 'status' => 'success' ), null );
+		}
 	}
 
 	private function make_order( WP_REST_Request $request ) {
@@ -96,7 +97,7 @@ class ICClub_API {
 		$note .= __( 'Order value', 'icclub' ) . ' : ' . $total_payed . '<br>';
 		$order->add_order_note( $note );
 
-		wp_send_json( array( 'status' => 'success' ), null );
+		return $order->get_order_number();
 	}
 
 	/**
