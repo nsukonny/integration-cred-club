@@ -3,7 +3,7 @@
  * Plugin Name: Integration Cred.club
  * Plugin URI: https://wordpress.org/plugins/integration-cred-club/
  * Description: API integration with Cred.club app, for get users data by orders
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: NSukonny
  * Author URI: https://nsukonny.ru
  * Text Domain: icclub

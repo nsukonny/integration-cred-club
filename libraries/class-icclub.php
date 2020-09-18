@@ -25,7 +25,7 @@ class ICClub {
 	 * @since 1.0.0
 	 * @var string
 	 */
-	private $version = '1.0.0';
+	private $version = '1.0.1';
 
 	/**
 	 * Instantiate the main class

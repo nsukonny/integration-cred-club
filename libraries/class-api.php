@@ -32,6 +32,7 @@ class ICClub_API {
 	 * @param WP_REST_Request $request
 	 *
 	 * @return false|string
+	 * @throws WC_Data_Exception
 	 */
 	public function get_order( WP_REST_Request $request ) {
 
@@ -45,59 +46,77 @@ class ICClub_API {
 			);
 		}
 
-		$order_id = $this->make_order( $request );
+		$json = json_decode( $request->get_body(), true );
+		$this->log( $json );
+		$order_id = $this->make_order( $json );
 		if ( $order_id ) {
 			wp_send_json( array( 'status' => 'success' ), null );
+		} else {
+			wp_send_json( array( 'status' => 'fail' ), null );
 		}
 	}
 
-	private function make_order( WP_REST_Request $request ) {
+	/**
+	 * Make order from taked data
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string[] $json
+	 *
+	 * @return string
+	 * @throws WC_Data_Exception
+	 */
+	private function make_order( $json ) {
 		global $woocommerce;
 
 		$countries_object = new WC_Countries();
 		$default_country  = $countries_object->get_base_country();
-		$customer_name    = explode( ' ', $request['customer_name'] );
+		$customer_name    = explode( ' ', $json['customer_name'] );
 		$shipping_address = array(
 			'first_name' => isset( $customer_name[0] ) ? sanitize_text_field( $customer_name[0] ) : '',
 			'last_name'  => isset( $customer_name[1] ) ? sanitize_text_field( $customer_name[1] ) : '',
-			'company'    => __( 'Order from cred add', 'icclub' ),
-			'email'      => isset( $request['shipping_address_email'] )
-				? sanitize_text_field( $request['shipping_address_email'] ) : '',
-			'phone'      => isset( $request['phone'] ) ? sanitize_text_field( $request['phone'] ) : '',
-			'address_1'  => isset( $request['shipping_address_line1'] )
-				? sanitize_text_field( $request['shipping_address_line1'] ) : '',
-			'address_2'  => isset( $request['shipping_address_line2'] )
-				? sanitize_text_field( $request['shipping_address_line2'] ) : '',
-			'city'       => isset( $request['shipping_address_city'] )
-				? sanitize_text_field( $request['shipping_address_city'] ) : '',
-			'state'      => $this->get_state_code( $request ),
-			'postcode'   => isset( $request['shipping_address_pincode'] )
-				? sanitize_text_field( $request['shipping_address_pincode'] ) : '',
+			'company'    => __( 'Order from cred app', 'icclub' ),
+			'email'      => isset( $json['shipping_address_email'] )
+				? sanitize_text_field( $json['shipping_address_email'] ) : '',
+			'phone'      => isset( $json['phone'] ) ? sanitize_text_field( $json['phone'] ) : '',
+			'address_1'  => isset( $json['shipping_address_line1'] )
+				? sanitize_text_field( $json['shipping_address_line1'] ) : '',
+			'address_2'  => isset( $json['shipping_address_line2'] )
+				? sanitize_text_field( $json['shipping_address_line2'] ) : '',
+			'city'       => isset( $json['shipping_address_city'] )
+				? sanitize_text_field( $json['shipping_address_city'] ) : '',
+			'state'      => $this->get_state_code( $json ),
+			'postcode'   => isset( $json['shipping_address_pincode'] )
+				? sanitize_text_field( $json['shipping_address_pincode'] ) : '',
 			'country'    => $default_country,
 		);
 
-		$total_payed = isset( $request['order_sales_value'] )
-			? sanitize_text_field( $request['order_sales_value'] ) : 0;
+		$total_payed = isset( $json['order_sales_value'] )
+			? sanitize_text_field( $json['order_sales_value'] ) : 0;
 
-		$order   = wc_create_order();
-		$product = wc_get_product( 291 );
-		$order->add_product( $product, 1 ); // This is an existing SIMPLE product
-		$order->set_address( $shipping_address, 'billing' );
-		//$order->calculate_totals();
-		$order->set_total( $total_payed );
-		$order->set_discount_total( $product->get_price() - $total_payed );
-		$order->update_status( 'processing', __( 'Getted from cred app', 'icclub' ), true );
+		$order      = wc_create_order();
+		$product_id = ! empty( $json['order_SKU'] ) ? wc_get_product_id_by_sku( $json['order_SKU'] ) : 0;
+		if ( 0 !== $product_id && $product_id ) {
+			$product = wc_get_product( $product_id );
+			$order->add_product( $product, 1 ); // This is an existing SIMPLE product
+			$order->set_address( $shipping_address, 'billing' );
+			//$order->calculate_totals();
+			$order->set_total( $total_payed );
+			$order->set_discount_total( $product->get_price() - $total_payed );
+			$order->update_status( 'processing', __( 'Getted from cred app', 'icclub' ), true );
+			$note = __( 'Offer ID', 'icclub' ) . ' : ' . ( isset( $json['offer_id'] )
+					? sanitize_text_field( $json['offer_id'] ) : '' ) . '<br>';
+			$note .= __( 'Order ID', 'icclub' ) . ' : ' . ( isset( $json['order_id'] )
+					? sanitize_text_field( $json['order_id'] ) : '' ) . '<br>';
+			$note .= __( 'Order SKU =', 'icclub' ) . ' : ' . ( isset( $json['order_SKU'] )
+					? sanitize_text_field( $json['order_SKU'] ) : '' ) . '<br>';
+			$note .= __( 'Order value', 'icclub' ) . ' : ' . $total_payed . '<br>';
+			$order->add_order_note( $note );
 
-		$note = __( 'Offer ID', 'icclub' ) . ' : ' . ( isset( $request['offer_id'] )
-				? sanitize_text_field( $request['offer_id'] ) : '' ) . '<br>';
-		$note .= __( 'Order ID', 'icclub' ) . ' : ' . ( isset( $request['order_id'] )
-				? sanitize_text_field( $request['order_id'] ) : '' ) . '<br>';
-		$note .= __( 'Order SKU =', 'icclub' ) . ' : ' . ( isset( $request['order_SKU'] )
-				? sanitize_text_field( $request['order_SKU'] ) : '' ) . '<br>';
-		$note .= __( 'Order value', 'icclub' ) . ' : ' . $total_payed . '<br>';
-		$order->add_order_note( $note );
+			return $order->get_order_number();
+		}
 
-		return $order->get_order_number();
+		return null;
 	}
 
 	/**
@@ -105,15 +124,15 @@ class ICClub_API {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param WP_REST_Request $request
+	 * @param $json
 	 *
 	 * @return int|string
 	 */
-	private function get_state_code( WP_REST_Request $request ) {
+	private function get_state_code( $json ) {
 		global $woocommerce;
 
-		$state = isset( $request['shipping_address_state'] )
-			? sanitize_text_field( $request['shipping_address_state'] ) : '';
+		$state = isset( $json['shipping_address_state'] )
+			? sanitize_text_field( $json['shipping_address_state'] ) : '';
 
 		$countries_object = new WC_Countries();
 		$default_country  = $countries_object->get_base_country();
@@ -126,6 +145,49 @@ class ICClub_API {
 		}
 
 		return '';
+	}
+
+	/**
+	 * Save all request to log for check
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param WP_REST_Request $request
+	 */
+	private function write_log( WP_REST_Request $request ) {
+
+		$file = 'requests.txt';
+		if ( file_exists( $file ) ) {
+			$current = file_get_contents( $file );
+		} else {
+			$current = '';
+		}
+
+		$current .= date( 'd.m.Y H:i:s' ) . ' ' . print_r( $request, true ) . '\n';
+		file_put_contents( $file, $current );
+
+	}
+
+	/**
+	 * Write requests to log
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param $json
+	 */
+	private function log( $json ) {
+
+		$log  = '';
+		$file = 'requests.log';
+
+		if ( file_exists( $file ) ) {
+			$log = file_get_contents( $file );
+		}
+
+		$log .= PHP_EOL . date( 'd.m.Y H:i:s' ) . ' : ' . PHP_EOL;
+		$log .= print_r( $json, true );
+
+		file_put_contents( $file, $log );
 	}
 
 }
